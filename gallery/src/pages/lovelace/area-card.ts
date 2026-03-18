@@ -122,67 +122,150 @@ class DemoArea extends LitElement {
     hass.updateTranslations(null, "en");
     hass.updateTranslations("lovelace", "en");
     hass.addEntities(ENTITIES);
-    hass.mockWS("config/area_registry/list", () => [
+    const areas = [
       {
+        aliases: [],
+        area_id: "bedroom",
+        created_at: 0,
+        floor_id: null,
+        humidity_entity_id: null,
+        icon: null,
+        labels: [],
+        modified_at: 0,
         name: "Bedroom",
-        area_id: "bedroom",
         picture: "/images/bed.png",
+        temperature_entity_id: null,
       },
       {
+        aliases: [],
+        area_id: "living_room",
+        created_at: 0,
+        floor_id: null,
+        humidity_entity_id: null,
+        icon: null,
+        labels: [],
+        modified_at: 0,
         name: "Living Room",
-        area_id: "living_room",
         picture: "/images/living_room.png",
+        temperature_entity_id: null,
       },
       {
+        aliases: [],
+        area_id: "office",
+        created_at: 0,
+        floor_id: null,
+        humidity_entity_id: null,
+        icon: null,
+        labels: [],
+        modified_at: 0,
         name: "Office",
-        area_id: "office",
         picture: "/images/office.jpg",
+        temperature_entity_id: null,
       },
       {
+        aliases: [],
+        area_id: "kitchen",
+        created_at: 0,
+        floor_id: null,
+        humidity_entity_id: null,
+        icon: null,
+        labels: [],
+        modified_at: 0,
         name: "Kitchen",
-        area_id: "kitchen",
         picture: "/images/kitchen.png",
+        temperature_entity_id: null,
       },
-    ]);
+    ];
+    hass.mockWS("config/area_registry/list", () => areas);
+    hass.mockWS("config/area_registry/subscribe", (_msg, _hass, onChange) => {
+      onChange?.({
+        i: areas.map((area) => ({
+          al: area.aliases,
+          cr: area.created_at,
+          fi: area.floor_id,
+          he: area.humidity_entity_id,
+          ic: area.icon,
+          id: area.area_id,
+          lb: area.labels,
+          mo: area.modified_at,
+          nm: area.name,
+          pc: area.picture,
+          te: area.temperature_entity_id,
+        })),
+      });
+      return () => undefined;
+    });
     hass.mockWS("config/device_registry/list", () => []);
-    hass.mockWS("config/entity_registry/list", () => [
-      {
-        area_id: "bedroom",
-        entity_id: "light.bed_light",
-      },
-      {
-        area_id: "bedroom",
-        entity_id: "switch.bed_ac",
-      },
-      {
-        area_id: "bedroom",
-        entity_id: "sensor.bed_temp",
-      },
-      {
-        area_id: "living_room",
-        entity_id: "light.living_room_light",
-      },
-      {
-        area_id: "living_room",
-        entity_id: "fan.living_room",
-      },
-      {
-        area_id: "office",
-        entity_id: "light.office",
-      },
-      {
-        area_id: "office",
-        entity_id: "sensor.office_humidity",
-      },
-      {
-        area_id: "kitchen",
-        entity_id: "fan.kitchen",
-      },
-      {
-        area_id: "kitchen",
-        entity_id: "binary_sensor.kitchen_door",
-      },
-    ]);
+    hass.mockWS("config/device_registry/subscribe", (_msg, _hass, onChange) => {
+      onChange?.({ i: [] });
+      return () => undefined;
+    });
+    const entityRegistry = [
+      "light.bed_light",
+      "switch.bed_ac",
+      "sensor.bed_temp",
+      "light.living_room_light",
+      "fan.living_room",
+      "light.office",
+      "sensor.office_humidity",
+      "fan.kitchen",
+      "binary_sensor.kitchen_door",
+    ].map((entityId) => ({
+      area_id:
+        entityId.indexOf("bed_") !== -1
+          ? "bedroom"
+          : entityId.indexOf("living_room") !== -1
+            ? "living_room"
+            : entityId.indexOf("office") !== -1
+              ? "office"
+              : "kitchen",
+      categories: {},
+      config_entry_id: null,
+      config_subentry_id: null,
+      created_at: 0,
+      device_id: null,
+      disabled_by: null,
+      entity_category: null,
+      entity_id: entityId,
+      has_entity_name: false,
+      hidden_by: null,
+      icon: null,
+      id: entityId.replaceAll(".", "-"),
+      labels: [],
+      modified_at: 0,
+      name: null,
+      options: null,
+      platform: "demo",
+      unique_id: entityId.replaceAll(".", "-"),
+    }));
+    hass.mockWS("config/entity_registry/list", () => entityRegistry);
+    hass.mockWS("config/entity_registry/subscribe", (_msg, _hass, onChange) => {
+      onChange?.({
+        i: entityRegistry.map((entry) => ({
+          ai: entry.area_id,
+          ce: entry.config_entry_id,
+          cg: entry.categories,
+          cr: entry.created_at,
+          cs: entry.config_subentry_id,
+          db: entry.disabled_by,
+          di: entry.device_id,
+          ec: entry.entity_category,
+          ei: entry.entity_id,
+          hb: entry.hidden_by,
+          hn: entry.has_entity_name,
+          ic: entry.icon,
+          id: entry.id,
+          lb: entry.labels,
+          mo: entry.modified_at,
+          nm: entry.name,
+          on: null,
+          op: entry.options,
+          pl: entry.platform,
+          ui: entry.unique_id,
+        })),
+      });
+      return () => undefined;
+    });
     mockIcons(hass);
   }
 }

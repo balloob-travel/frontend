@@ -1,10 +1,11 @@
 import type { Connection } from "home-assistant-js-websocket";
-import { createCollection } from "home-assistant-js-websocket";
+import { getCollection } from "home-assistant-js-websocket";
 import type { Store } from "home-assistant-js-websocket/dist/store";
 import { stringCompare } from "../../common/string/compare";
-import { debounce } from "../../common/util/debounce";
 import type { HomeAssistant } from "../../types";
 import type { RegistryEntry } from "../registry";
+import type { RegistryCollectionUpdate } from "../ws-registry";
+import { processRegistryCollectionUpdate } from "../ws-registry";
 
 export interface LabelRegistryEntry extends RegistryEntry {
   label_id: string;
@@ -32,33 +33,64 @@ export const fetchLabelRegistry = (conn: Connection) =>
       )
     );
 
+interface CompressedLabelRegistryEntry {
+  co: string | null;
+  cr: number;
+  de: string | null;
+  ic: string | null;
+  id: string;
+  mo: number;
+  nm: string;
+}
+
+const decompressLabelRegistryEntry = (
+  entry: CompressedLabelRegistryEntry
+): LabelRegistryEntry => ({
+  color: entry.co,
+  created_at: entry.cr,
+  description: entry.de,
+  icon: entry.ic,
+  label_id: entry.id,
+  modified_at: entry.mo,
+  name: entry.nm,
+});
+
+const processLabelRegistryUpdate = (
+  store: Store<LabelRegistryEntry[]>,
+  updates: RegistryCollectionUpdate<CompressedLabelRegistryEntry>
+) =>
+  store.setState(
+    processRegistryCollectionUpdate(
+      store.state,
+      updates,
+      decompressLabelRegistryEntry,
+      (entry) => entry.label_id,
+      (entry1, entry2) => stringCompare(entry1.name, entry2.name)
+    ),
+    true
+  );
+
 export const subscribeLabelRegistryUpdates = (
   conn: Connection,
   store: Store<LabelRegistryEntry[]>
 ) =>
-  conn.subscribeEvents(
-    debounce(
-      () =>
-        fetchLabelRegistry(conn).then((labels: LabelRegistryEntry[]) =>
-          store.setState(labels, true)
-        ),
-      500,
-      true
-    ),
-    "label_registry_updated"
+  conn.subscribeMessage<RegistryCollectionUpdate<CompressedLabelRegistryEntry>>(
+    (updates) => processLabelRegistryUpdate(store, updates),
+    {
+      type: "config/label_registry/subscribe",
+    }
   );
 
 export const subscribeLabelRegistry = (
   conn: Connection,
   onChange: (labels: LabelRegistryEntry[]) => void
 ) =>
-  createCollection<LabelRegistryEntry[]>(
-    "_labelRegistry",
-    fetchLabelRegistry,
-    subscribeLabelRegistryUpdates,
+  getCollection(
     conn,
-    onChange
-  );
+    "_labelRegistry",
+    undefined,
+    subscribeLabelRegistryUpdates
+  ).subscribe(onChange);
 
 export const createLabelRegistryEntry = (
   hass: HomeAssistant,

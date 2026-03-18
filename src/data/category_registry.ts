@@ -1,11 +1,13 @@
 import type { Connection } from "home-assistant-js-websocket";
-import { createCollection } from "home-assistant-js-websocket";
+import { getCollection } from "home-assistant-js-websocket";
 import type { Store } from "home-assistant-js-websocket/dist/store";
 import { stringCompare } from "../common/string/compare";
 import type { HomeAssistant } from "../types";
-import { debounce } from "../common/util/debounce";
+import type { RegistryEntry } from "./registry";
+import type { RegistryCollectionUpdate } from "./ws-registry";
+import { processRegistryCollectionUpdate } from "./ws-registry";
 
-export interface CategoryRegistryEntry {
+export interface CategoryRegistryEntry extends RegistryEntry {
   category_id: string;
   name: string;
   icon: string | null;
@@ -26,30 +28,56 @@ export const fetchCategoryRegistry = (conn: Connection, scope: string) =>
       categories.sort((ent1, ent2) => stringCompare(ent1.name, ent2.name))
     );
 
+interface CompressedCategoryRegistryEntry {
+  cr: number;
+  ic: string | null;
+  id: string;
+  mo: number;
+  nm: string;
+}
+
+const decompressCategoryRegistryEntry = (
+  entry: CompressedCategoryRegistryEntry
+): CategoryRegistryEntry => ({
+  category_id: entry.id,
+  created_at: entry.cr,
+  icon: entry.ic,
+  modified_at: entry.mo,
+  name: entry.nm,
+});
+
+const processCategoryRegistryUpdate = (
+  store: Store<CategoryRegistryEntry[]>,
+  updates: RegistryCollectionUpdate<CompressedCategoryRegistryEntry>
+) =>
+  store.setState(
+    processRegistryCollectionUpdate(
+      store.state,
+      updates,
+      decompressCategoryRegistryEntry,
+      (entry) => entry.category_id,
+      (entry1, entry2) => stringCompare(entry1.name, entry2.name)
+    ),
+    true
+  );
+
 export const subscribeCategoryRegistry = (
   conn: Connection,
   scope: string,
   onChange: (floors: CategoryRegistryEntry[]) => void
 ) =>
-  createCollection<CategoryRegistryEntry[]>(
-    `_categoryRegistry_${scope}`,
-    (conn2: Connection) => fetchCategoryRegistry(conn2, scope),
-    (conn2: Connection, store: Store<CategoryRegistryEntry[]>) =>
-      conn2.subscribeEvents(
-        debounce(
-          () =>
-            fetchCategoryRegistry(conn2, scope).then(
-              (categories: CategoryRegistryEntry[]) =>
-                store.setState(categories, true)
-            ),
-          500,
-          true
-        ),
-        "category_registry_updated"
-      ),
+  getCollection(
     conn,
-    onChange
-  );
+    `_categoryRegistry_${scope}`,
+    undefined,
+    (conn2: Connection, store: Store<CategoryRegistryEntry[]>) =>
+      conn2.subscribeMessage<
+        RegistryCollectionUpdate<CompressedCategoryRegistryEntry>
+      >((updates) => processCategoryRegistryUpdate(store, updates), {
+        type: "config/category_registry/subscribe",
+        scope,
+      })
+  ).subscribe(onChange);
 
 export const createCategoryRegistryEntry = (
   hass: HomeAssistant,

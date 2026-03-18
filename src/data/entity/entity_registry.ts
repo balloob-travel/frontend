@@ -1,15 +1,16 @@
 import type { Connection } from "home-assistant-js-websocket";
-import { createCollection } from "home-assistant-js-websocket";
+import { getCollection } from "home-assistant-js-websocket";
 import type { Store } from "home-assistant-js-websocket/dist/store";
 import memoizeOne from "memoize-one";
 import { computeDomain } from "../../common/entity/compute_domain";
 import { computeStateName } from "../../common/entity/compute_state_name";
 import { caseInsensitiveStringCompare } from "../../common/string/compare";
-import { debounce } from "../../common/util/debounce";
 import type { HomeAssistant } from "../../types";
 import type { LightColor } from "../light";
 import type { RegistryEntry } from "../registry";
 import type { Segment } from "../vacuum";
+import type { RegistryCollectionUpdate } from "../ws-registry";
+import { processRegistryCollectionUpdate } from "../ws-registry";
 
 type EntityCategory = "config" | "diagnostic";
 
@@ -261,33 +262,90 @@ export const fetchEntityRegistryDisplay = (conn: Connection) =>
     type: "config/entity_registry/list_for_display",
   });
 
+interface CompressedEntityRegistryEntry {
+  ai: string | null;
+  ce: string | null;
+  cg: Record<string, string>;
+  cr: number;
+  cs: string | null;
+  db: EntityRegistryEntry["disabled_by"];
+  di: string | null;
+  ec: EntityCategory | null;
+  ei: string;
+  hb: EntityRegistryEntry["hidden_by"];
+  hn: boolean;
+  ic: string | null;
+  id: string;
+  lb: string[];
+  mo: number;
+  nm: string | null;
+  on: string | null;
+  op: EntityRegistryOptions | null;
+  pl: string;
+  tk?: string;
+  ui: string;
+}
+
+const decompressEntityRegistryEntry = (
+  entry: CompressedEntityRegistryEntry
+): EntityRegistryEntry => ({
+  area_id: entry.ai,
+  categories: entry.cg,
+  config_entry_id: entry.ce,
+  config_subentry_id: entry.cs,
+  created_at: entry.cr,
+  device_id: entry.di,
+  disabled_by: entry.db,
+  entity_category: entry.ec,
+  entity_id: entry.ei,
+  has_entity_name: entry.hn,
+  hidden_by: entry.hb,
+  icon: entry.ic,
+  id: entry.id,
+  labels: entry.lb,
+  modified_at: entry.mo,
+  name: entry.nm,
+  options: entry.op,
+  original_name: entry.on ?? undefined,
+  platform: entry.pl,
+  translation_key: entry.tk,
+  unique_id: entry.ui,
+});
+
+const processEntityRegistryUpdate = (
+  store: Store<EntityRegistryEntry[]>,
+  updates: RegistryCollectionUpdate<CompressedEntityRegistryEntry>
+) =>
+  store.setState(
+    processRegistryCollectionUpdate(
+      store.state,
+      updates,
+      decompressEntityRegistryEntry,
+      (entry) => entry.entity_id
+    ),
+    true
+  );
+
 const subscribeEntityRegistryUpdates = (
   conn: Connection,
   store: Store<EntityRegistryEntry[]>
 ) =>
-  conn.subscribeEvents(
-    debounce(
-      () =>
-        fetchEntityRegistry(conn).then((entities) =>
-          store.setState(entities, true)
-        ),
-      500,
-      true
-    ),
-    "entity_registry_updated"
-  );
+  conn.subscribeMessage<
+    RegistryCollectionUpdate<CompressedEntityRegistryEntry>
+  >((updates) => processEntityRegistryUpdate(store, updates), {
+    type: "config/entity_registry/subscribe",
+  });
 
 export const subscribeEntityRegistry = (
   conn: Connection,
   onChange: (entities: EntityRegistryEntry[]) => void
 ) =>
-  createCollection<EntityRegistryEntry[]>(
-    "_entityRegistry",
-    fetchEntityRegistry,
-    subscribeEntityRegistryUpdates,
+  getCollection(
     conn,
-    onChange
-  );
+    "_entityRegistry",
+    undefined,
+    subscribeEntityRegistryUpdates
+  ).subscribe(onChange);
 
 export const sortEntityRegistryByName = (
   entries: EntityRegistryEntry[],
