@@ -1,8 +1,11 @@
+import type { Connection, MessageBase } from "home-assistant-js-websocket";
+import { getCollection } from "home-assistant-js-websocket";
+import type { Store } from "home-assistant-js-websocket/dist/store";
+
 export interface RegistryCollectionUpdate<EncodedEntry> {
   i?: EncodedEntry[];
-  a?: EncodedEntry[];
-  c?: EncodedEntry[];
-  r?: string[];
+  u?: EncodedEntry;
+  r?: string;
   o?: string[];
 }
 
@@ -15,37 +18,21 @@ export const processRegistryCollectionUpdate = <EncodedEntry, DecodedEntry>(
 ): DecodedEntry[] => {
   let next = updates.i ? updates.i.map(decodeEntry) : [...(current ?? [])];
 
-  for (const encodedEntry of updates.a ?? []) {
-    const entry = decodeEntry(encodedEntry);
+  if (updates.u) {
+    const entry = decodeEntry(updates.u);
     const index = next.findIndex(
       (currentEntry) => entryId(currentEntry) === entryId(entry)
     );
 
     if (index === -1) {
       next.push(entry);
-      continue;
+    } else {
+      next[index] = entry;
     }
-
-    next[index] = entry;
   }
 
-  for (const encodedEntry of updates.c ?? []) {
-    const entry = decodeEntry(encodedEntry);
-    const index = next.findIndex(
-      (currentEntry) => entryId(currentEntry) === entryId(entry)
-    );
-
-    if (index === -1) {
-      next.push(entry);
-      continue;
-    }
-
-    next[index] = entry;
-  }
-
-  if (updates.r?.length) {
-    const removed = new Set(updates.r);
-    next = next.filter((entry) => !removed.has(entryId(entry)));
+  if (updates.r) {
+    next = next.filter((entry) => entryId(entry) !== updates.r);
   }
 
   if (updates.o?.length) {
@@ -63,3 +50,46 @@ export const processRegistryCollectionUpdate = <EncodedEntry, DecodedEntry>(
 
   return next;
 };
+
+export const createCollectionSubscription =
+  <State, Update, SubscribeMessage extends MessageBase>(
+    collectionKey: string,
+    subscribeMessage: SubscribeMessage,
+    processUpdate: (current: State | undefined, update: Update) => State
+  ) =>
+  (conn: Connection, onChange: (state: State) => void) =>
+    getCollection(
+      conn,
+      collectionKey,
+      undefined,
+      (conn2: Connection, store: Store<State>) =>
+        conn2.subscribeMessage<Update>(
+          (update) => store.setState(processUpdate(store.state, update), true),
+          subscribeMessage
+        )
+    ).subscribe(onChange);
+
+export const createRegistryCollection = <
+  EncodedEntry,
+  DecodedEntry,
+  SubscribeMessage extends MessageBase,
+>(
+  collectionKey: string,
+  subscribeMessage: SubscribeMessage,
+  decodeEntry: (entry: EncodedEntry) => DecodedEntry,
+  entryId: (entry: DecodedEntry) => string,
+  sortEntries?: (entry1: DecodedEntry, entry2: DecodedEntry) => number
+) =>
+  createCollectionSubscription<
+    DecodedEntry[],
+    RegistryCollectionUpdate<EncodedEntry>,
+    SubscribeMessage
+  >(collectionKey, subscribeMessage, (current, updates) =>
+    processRegistryCollectionUpdate(
+      current,
+      updates,
+      decodeEntry,
+      entryId,
+      sortEntries
+    )
+  );

@@ -1,6 +1,4 @@
 import type { Connection } from "home-assistant-js-websocket";
-import { getCollection } from "home-assistant-js-websocket";
-import type { Store } from "home-assistant-js-websocket/dist/store";
 import memoizeOne from "memoize-one";
 import { computeDomain } from "../../common/entity/compute_domain";
 import { computeStateName } from "../../common/entity/compute_state_name";
@@ -9,8 +7,7 @@ import type { HomeAssistant } from "../../types";
 import type { LightColor } from "../light";
 import type { RegistryEntry } from "../registry";
 import type { Segment } from "../vacuum";
-import type { RegistryCollectionUpdate } from "../ws-registry";
-import { processRegistryCollectionUpdate } from "../ws-registry";
+import { createRegistryCollection } from "../ws-registry";
 
 type EntityCategory = "config" | "diagnostic";
 
@@ -312,40 +309,17 @@ const decompressEntityRegistryEntry = (
   unique_id: entry.ui,
 });
 
-const processEntityRegistryUpdate = (
-  store: Store<EntityRegistryEntry[]>,
-  updates: RegistryCollectionUpdate<CompressedEntityRegistryEntry>
-) =>
-  store.setState(
-    processRegistryCollectionUpdate(
-      store.state,
-      updates,
-      decompressEntityRegistryEntry,
-      (entry) => entry.entity_id
-    ),
-    true
-  );
-
-const subscribeEntityRegistryUpdates = (
-  conn: Connection,
-  store: Store<EntityRegistryEntry[]>
-) =>
-  conn.subscribeMessage<
-    RegistryCollectionUpdate<CompressedEntityRegistryEntry>
-  >((updates) => processEntityRegistryUpdate(store, updates), {
-    type: "config/entity_registry/subscribe",
-  });
+const subscribeEntityRegistryUpdates = createRegistryCollection(
+  "_entityRegistry",
+  { type: "config/entity_registry/subscribe" },
+  decompressEntityRegistryEntry,
+  (entry: EntityRegistryEntry) => entry.entity_id
+);
 
 export const subscribeEntityRegistry = (
   conn: Connection,
   onChange: (entities: EntityRegistryEntry[]) => void
-) =>
-  getCollection(
-    conn,
-    "_entityRegistry",
-    undefined,
-    subscribeEntityRegistryUpdates
-  ).subscribe(onChange);
+) => subscribeEntityRegistryUpdates(conn, onChange);
 
 export const sortEntityRegistryByName = (
   entries: EntityRegistryEntry[],

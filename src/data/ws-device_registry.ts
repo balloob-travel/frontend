@@ -1,9 +1,6 @@
 import type { Connection } from "home-assistant-js-websocket";
-import { getCollection } from "home-assistant-js-websocket";
-import type { Store } from "home-assistant-js-websocket/dist/store";
 import type { DeviceRegistryEntry } from "./device/device_registry";
-import type { RegistryCollectionUpdate } from "./ws-registry";
-import { processRegistryCollectionUpdate } from "./ws-registry";
+import { createRegistryCollection } from "./ws-registry";
 
 export const fetchDeviceRegistry = (conn: Connection) =>
   conn.sendMessagePromise<DeviceRegistryEntry[]>({
@@ -62,37 +59,14 @@ const decompressDeviceRegistryEntry = (
   via_device_id: entry.vd,
 });
 
-const processDeviceRegistryUpdate = (
-  store: Store<DeviceRegistryEntry[]>,
-  updates: RegistryCollectionUpdate<CompressedDeviceRegistryEntry>
-) =>
-  store.setState(
-    processRegistryCollectionUpdate(
-      store.state,
-      updates,
-      decompressDeviceRegistryEntry,
-      (entry) => entry.id
-    ),
-    true
-  );
-
-const subscribeDeviceRegistryUpdates = (
-  conn: Connection,
-  store: Store<DeviceRegistryEntry[]>
-) =>
-  conn.subscribeMessage<
-    RegistryCollectionUpdate<CompressedDeviceRegistryEntry>
-  >((updates) => processDeviceRegistryUpdate(store, updates), {
-    type: "config/device_registry/subscribe",
-  });
+const subscribeDeviceRegistryUpdates = createRegistryCollection(
+  "_dr",
+  { type: "config/device_registry/subscribe" },
+  decompressDeviceRegistryEntry,
+  (entry: DeviceRegistryEntry) => entry.id
+);
 
 export const subscribeDeviceRegistry = (
   conn: Connection,
   onChange: (devices: DeviceRegistryEntry[]) => void
-) =>
-  getCollection(
-    conn,
-    "_dr",
-    undefined,
-    subscribeDeviceRegistryUpdates
-  ).subscribe(onChange);
+) => subscribeDeviceRegistryUpdates(conn, onChange);

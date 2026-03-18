@@ -1,9 +1,6 @@
 import type { Connection } from "home-assistant-js-websocket";
-import { getCollection } from "home-assistant-js-websocket";
-import type { Store } from "home-assistant-js-websocket/dist/store";
 import type { AreaRegistryEntry } from "./area/area_registry";
-import type { RegistryCollectionUpdate } from "./ws-registry";
-import { processRegistryCollectionUpdate } from "./ws-registry";
+import { createRegistryCollection } from "./ws-registry";
 
 export const fetchAreaRegistry = (conn: Connection) =>
   conn.sendMessagePromise<AreaRegistryEntry[]>({
@@ -40,38 +37,14 @@ const decompressAreaRegistryEntry = (
   temperature_entity_id: entry.te,
 });
 
-const processAreaRegistryUpdate = (
-  store: Store<AreaRegistryEntry[]>,
-  updates: RegistryCollectionUpdate<CompressedAreaRegistryEntry>
-) =>
-  store.setState(
-    processRegistryCollectionUpdate(
-      store.state,
-      updates,
-      decompressAreaRegistryEntry,
-      (entry) => entry.area_id
-    ),
-    true
-  );
-
-const subscribeAreaRegistryUpdates = (
-  conn: Connection,
-  store: Store<AreaRegistryEntry[]>
-) =>
-  conn.subscribeMessage<RegistryCollectionUpdate<CompressedAreaRegistryEntry>>(
-    (updates) => processAreaRegistryUpdate(store, updates),
-    {
-      type: "config/area_registry/subscribe",
-    }
-  );
+const subscribeAreaRegistryUpdates = createRegistryCollection(
+  "_areaRegistry",
+  { type: "config/area_registry/subscribe" },
+  decompressAreaRegistryEntry,
+  (entry: AreaRegistryEntry) => entry.area_id
+);
 
 export const subscribeAreaRegistry = (
   conn: Connection,
   onChange: (areas: AreaRegistryEntry[]) => void
-) =>
-  getCollection(
-    conn,
-    "_areaRegistry",
-    undefined,
-    subscribeAreaRegistryUpdates
-  ).subscribe(onChange);
+) => subscribeAreaRegistryUpdates(conn, onChange);

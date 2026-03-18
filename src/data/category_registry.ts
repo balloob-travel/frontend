@@ -1,11 +1,8 @@
 import type { Connection } from "home-assistant-js-websocket";
-import { getCollection } from "home-assistant-js-websocket";
-import type { Store } from "home-assistant-js-websocket/dist/store";
 import { stringCompare } from "../common/string/compare";
 import type { HomeAssistant } from "../types";
 import type { RegistryEntry } from "./registry";
-import type { RegistryCollectionUpdate } from "./ws-registry";
-import { processRegistryCollectionUpdate } from "./ws-registry";
+import { createRegistryCollection } from "./ws-registry";
 
 export interface CategoryRegistryEntry extends RegistryEntry {
   category_id: string;
@@ -46,38 +43,21 @@ const decompressCategoryRegistryEntry = (
   name: entry.nm,
 });
 
-const processCategoryRegistryUpdate = (
-  store: Store<CategoryRegistryEntry[]>,
-  updates: RegistryCollectionUpdate<CompressedCategoryRegistryEntry>
-) =>
-  store.setState(
-    processRegistryCollectionUpdate(
-      store.state,
-      updates,
-      decompressCategoryRegistryEntry,
-      (entry) => entry.category_id,
-      (entry1, entry2) => stringCompare(entry1.name, entry2.name)
-    ),
-    true
-  );
-
 export const subscribeCategoryRegistry = (
   conn: Connection,
   scope: string,
   onChange: (floors: CategoryRegistryEntry[]) => void
 ) =>
-  getCollection(
-    conn,
+  createRegistryCollection(
     `_categoryRegistry_${scope}`,
-    undefined,
-    (conn2: Connection, store: Store<CategoryRegistryEntry[]>) =>
-      conn2.subscribeMessage<
-        RegistryCollectionUpdate<CompressedCategoryRegistryEntry>
-      >((updates) => processCategoryRegistryUpdate(store, updates), {
-        type: "config/category_registry/subscribe",
-        scope,
-      })
-  ).subscribe(onChange);
+    {
+      type: "config/category_registry/subscribe",
+      scope,
+    },
+    decompressCategoryRegistryEntry,
+    (entry: CategoryRegistryEntry) => entry.category_id,
+    (entry1, entry2) => stringCompare(entry1.name, entry2.name)
+  )(conn, onChange);
 
 export const createCategoryRegistryEntry = (
   hass: HomeAssistant,

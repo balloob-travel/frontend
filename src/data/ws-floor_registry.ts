@@ -1,9 +1,6 @@
 import type { Connection } from "home-assistant-js-websocket";
-import { getCollection } from "home-assistant-js-websocket";
-import type { Store } from "home-assistant-js-websocket/dist/store";
 import type { FloorRegistryEntry } from "./floor_registry";
-import type { RegistryCollectionUpdate } from "./ws-registry";
-import { processRegistryCollectionUpdate } from "./ws-registry";
+import { createRegistryCollection } from "./ws-registry";
 
 export const fetchFloorRegistry = (conn: Connection) =>
   conn.sendMessagePromise<FloorRegistryEntry[]>({
@@ -32,38 +29,14 @@ const decompressFloorRegistryEntry = (
   name: entry.nm,
 });
 
-const processFloorRegistryUpdate = (
-  store: Store<FloorRegistryEntry[]>,
-  updates: RegistryCollectionUpdate<CompressedFloorRegistryEntry>
-) =>
-  store.setState(
-    processRegistryCollectionUpdate(
-      store.state,
-      updates,
-      decompressFloorRegistryEntry,
-      (entry) => entry.floor_id
-    ),
-    true
-  );
-
-const subscribeFloorRegistryUpdates = (
-  conn: Connection,
-  store: Store<FloorRegistryEntry[]>
-) =>
-  conn.subscribeMessage<RegistryCollectionUpdate<CompressedFloorRegistryEntry>>(
-    (updates) => processFloorRegistryUpdate(store, updates),
-    {
-      type: "config/floor_registry/subscribe",
-    }
-  );
+const subscribeFloorRegistryUpdates = createRegistryCollection(
+  "_floorRegistry",
+  { type: "config/floor_registry/subscribe" },
+  decompressFloorRegistryEntry,
+  (entry: FloorRegistryEntry) => entry.floor_id
+);
 
 export const subscribeFloorRegistry = (
   conn: Connection,
   onChange: (floors: FloorRegistryEntry[]) => void
-) =>
-  getCollection(
-    conn,
-    "_floorRegistry",
-    undefined,
-    subscribeFloorRegistryUpdates
-  ).subscribe(onChange);
+) => subscribeFloorRegistryUpdates(conn, onChange);

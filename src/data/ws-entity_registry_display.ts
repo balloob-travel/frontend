@@ -1,9 +1,10 @@
 import type { Connection } from "home-assistant-js-websocket";
-import { getCollection } from "home-assistant-js-websocket";
-import type { Store } from "home-assistant-js-websocket/dist/store";
 import type { EntityRegistryDisplayEntryResponse } from "./entity/entity_registry";
-import type { RegistryCollectionUpdate } from "./ws-registry";
-import { processRegistryCollectionUpdate } from "./ws-registry";
+import {
+  createCollectionSubscription,
+  type RegistryCollectionUpdate,
+  processRegistryCollectionUpdate,
+} from "./ws-registry";
 
 interface EntityRegistryDisplayUpdate extends RegistryCollectionUpdate<
   EntityRegistryDisplayEntryResponse["entities"][number]
@@ -12,44 +13,30 @@ interface EntityRegistryDisplayUpdate extends RegistryCollectionUpdate<
 }
 
 const processEntityRegistryDisplayUpdate = (
-  store: Store<EntityRegistryDisplayEntryResponse>,
+  current: EntityRegistryDisplayEntryResponse | undefined,
   updates: EntityRegistryDisplayUpdate
-) => {
-  const entityCategories = updates.ec ?? store.state?.entity_categories ?? {};
+): EntityRegistryDisplayEntryResponse => {
+  const entityCategories = updates.ec ?? current?.entity_categories ?? {};
   const entities = processRegistryCollectionUpdate(
-    store.state?.entities,
+    current?.entities,
     updates,
     (entry) => entry,
     (entry) => entry.ei
   );
 
-  store.setState(
-    {
-      entities,
-      entity_categories: entityCategories,
-    },
-    true
-  );
+  return {
+    entities,
+    entity_categories: entityCategories,
+  };
 };
 
-const subscribeEntityRegistryDisplayUpdates = (
-  conn: Connection,
-  store: Store<EntityRegistryDisplayEntryResponse>
-) =>
-  conn.subscribeMessage<EntityRegistryDisplayUpdate>(
-    (updates) => processEntityRegistryDisplayUpdate(store, updates),
-    {
-      type: "config/entity_registry/subscribe_for_display",
-    }
-  );
+const subscribeEntityRegistryDisplayUpdates = createCollectionSubscription(
+  "_entityRegistryDisplay",
+  { type: "config/entity_registry/subscribe_for_display" },
+  processEntityRegistryDisplayUpdate
+);
 
 export const subscribeEntityRegistryDisplay = (
   conn: Connection,
   onChange: (entities: EntityRegistryDisplayEntryResponse) => void
-) =>
-  getCollection(
-    conn,
-    "_entityRegistryDisplay",
-    undefined,
-    subscribeEntityRegistryDisplayUpdates
-  ).subscribe(onChange);
+) => subscribeEntityRegistryDisplayUpdates(conn, onChange);
