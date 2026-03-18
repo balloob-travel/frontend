@@ -9941,7 +9941,9 @@
           "prompt_copy_token": "Copy your access token. It will not be shown again.",
           "empty_state": "You have no long-lived access tokens yet.",
           "qr_code_image": "QR code for token {name}",
-          "generate_qr_code": "Generate QR code"
+          "generate_qr_code": "Generate QR code",
+          "show_token_only_qr_code": "Show token only QR code",
+          "show_v2_qr_code": "Show v2 QR code"
         }
       },
       "todo": {

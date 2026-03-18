@@ -1,5 +1,5 @@
 import { mdiContentCopy, mdiQrcode } from "@mdi/js";
-import type { CSSResultGroup, TemplateResult } from "lit";
+import type { CSSResultGroup } from "lit";
 import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators";
 import { fireEvent } from "../../common/dom/fire_event";
@@ -16,12 +16,23 @@ import type { LongLivedAccessTokenDialogParams } from "./show-long-lived-access-
 import { showToast } from "../../util/toast";
 
 const QR_LOGO_URL = "/static/icons/favicon-192x192.png";
+type LongLivedAccessTokenQRCodeVersion = "v2" | "token_only";
+
+interface LongLivedAccessTokenQRCodeV2 {
+  version: 2;
+  type: "long_lived_access_token";
+  url: string;
+  token: string;
+}
 
 @customElement("ha-long-lived-access-token-dialog")
 export class HaLongLivedAccessTokenDialog extends LitElement {
   @property({ attribute: false }) public hass!: HomeAssistant;
 
-  @state() private _qrCode?: TemplateResult;
+  @state() private _qrCode?: string;
+
+  @state()
+  private _qrCodeVersion: LongLivedAccessTokenQRCodeVersion = "v2";
 
   @state() private _open = false;
 
@@ -61,6 +72,7 @@ export class HaLongLivedAccessTokenDialog extends LitElement {
     this._errorMessage = undefined;
     this._loading = false;
     this._qrCode = undefined;
+    this._qrCodeVersion = "v2";
     fireEvent(this, "dialog-closed", { dialog: this.localName });
   }
 
@@ -112,24 +124,7 @@ export class HaLongLivedAccessTokenDialog extends LitElement {
                     ${this.hass.localize("ui.common.copy")}
                   </ha-button>
                 </div>
-                <div id="qr">
-                  ${this._qrCode
-                    ? this._qrCode
-                    : html`
-                        <ha-button
-                          appearance="plain"
-                          @click=${this._generateQR}
-                        >
-                          <ha-svg-icon
-                            slot="start"
-                            .path=${mdiQrcode}
-                          ></ha-svg-icon>
-                          ${this.hass.localize(
-                            "ui.panel.profile.long_lived_access_tokens.generate_qr_code"
-                          )}
-                        </ha-button>
-                      `}
-                </div>
+                <div id="qr">${this._renderQRCode()}</div>
               `
             : html`
                 <ha-textfield
@@ -228,13 +223,74 @@ export class HaLongLivedAccessTokenDialog extends LitElement {
     return this._existingNames.has(this._normalizeName(this._name));
   }
 
-  private async _generateQR() {
+  private _renderQRCode() {
+    if (this._qrCode) {
+      return html`
+        <img
+          alt=${this.hass.localize(
+            "ui.panel.profile.long_lived_access_tokens.qr_code_image",
+            { name: this._name }
+          )}
+          src=${this._qrCode}
+        ></img>
+        <button
+          type="button"
+          class="qr-version-link"
+          @click=${this._toggleQRCodeVersion}
+        >
+          ${this.hass.localize(
+            this._qrCodeVersion === "v2"
+              ? "ui.panel.profile.long_lived_access_tokens.show_token_only_qr_code"
+              : "ui.panel.profile.long_lived_access_tokens.show_v2_qr_code"
+          )}
+        </button>
+      `;
+    }
+
+    return html`
+      <ha-button appearance="plain" @click=${this._generateQR}>
+        <ha-svg-icon slot="start" .path=${mdiQrcode}></ha-svg-icon>
+        ${this.hass.localize(
+          "ui.panel.profile.long_lived_access_tokens.generate_qr_code"
+        )}
+      </ha-button>
+    `;
+  }
+
+  private _qrCodeData(
+    version: LongLivedAccessTokenQRCodeVersion
+  ): string | undefined {
     if (!this._token) {
+      return undefined;
+    }
+
+    if (version === "token_only") {
+      return this._token;
+    }
+
+    const payload: LongLivedAccessTokenQRCodeV2 = {
+      version: 2,
+      type: "long_lived_access_token",
+      url: document.location.origin,
+      token: this._token,
+    };
+
+    return JSON.stringify(payload);
+  }
+
+  private async _toggleQRCodeVersion() {
+    await this._generateQR(this._qrCodeVersion === "v2" ? "token_only" : "v2");
+  }
+
+  private async _generateQR(version: LongLivedAccessTokenQRCodeVersion = "v2") {
+    const qrCodeData = this._qrCodeData(version);
+
+    if (!qrCodeData) {
       return;
     }
 
     const qrcode = await import("qrcode");
-    const canvas = await qrcode.toCanvas(this._token, {
+    const canvas = await qrcode.toCanvas(qrCodeData, {
       width: 512,
       errorCorrectionLevel: "Q",
     });
@@ -254,13 +310,8 @@ export class HaLongLivedAccessTokenDialog extends LitElement {
     );
 
     await withViewTransition(() => {
-      this._qrCode = html`<img
-          alt=${this.hass.localize(
-            "ui.panel.profile.long_lived_access_tokens.qr_code_image",
-            { name: this._name }
-          )}
-          src=${canvas.toDataURL()}
-        ></img>`;
+      this._qrCodeVersion = version;
+      this._qrCode = canvas.toDataURL();
     });
   }
 
@@ -269,12 +320,24 @@ export class HaLongLivedAccessTokenDialog extends LitElement {
       css`
         #qr {
           text-align: center;
+          display: grid;
+          gap: var(--ha-space-2);
+          justify-items: center;
         }
         #qr img {
           max-width: 90%;
           height: auto;
           display: block;
           margin: 0 auto;
+        }
+        .qr-version-link {
+          border: 0;
+          background: none;
+          padding: 0;
+          color: var(--primary-color);
+          cursor: pointer;
+          font: inherit;
+          text-decoration: underline;
         }
         .content {
           display: grid;
