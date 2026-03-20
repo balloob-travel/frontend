@@ -3,8 +3,10 @@ import { customElement } from "lit/decorators";
 import { getAreasFloorHierarchy } from "../../../../common/areas/areas-floor-hierarchy";
 import { computeDomain } from "../../../../common/entity/compute_domain";
 import { computeDeviceName } from "../../../../common/entity/compute_device_name";
+import { computeStateName } from "../../../../common/entity/compute_state_name";
 import { getEntityContext } from "../../../../common/entity/context/get_entity_context";
 import { generateEntityFilter } from "../../../../common/entity/entity_filter";
+import { stripPrefixFromEntityName } from "../../../../common/entity/strip_prefix_from_entity_name";
 import { clamp } from "../../../../common/number/clamp";
 import type { LovelaceCardConfig } from "../../../../data/lovelace/config/card";
 import type {
@@ -15,13 +17,13 @@ import type { LovelaceViewConfig } from "../../../../data/lovelace/config/view";
 import type { HomeAssistant } from "../../../../types";
 import type {
   EmptyStateCardConfig,
+  EntitiesCardConfig,
   HeadingCardConfig,
   MaintenanceStatusCardConfig,
   RepairsCardConfig,
-  TileCardConfig,
   UpdatesCardConfig,
 } from "../../cards/types";
-import { computeAreaTileCardConfig } from "../areas/helpers/areas-strategy-helper";
+import type { LovelaceRowConfig } from "../../entity-rows/types";
 import {
   LARGE_SCREEN_CONDITION,
   SMALL_SCREEN_CONDITION,
@@ -32,57 +34,105 @@ export interface HomeMaintenanceViewStrategyConfig {
   type: "home-maintenance";
 }
 
-interface DeviceMaintenanceEntities {
-  device_id: string;
-  entities: string[];
-}
+const compareMaintenanceEntities = (
+  hass: HomeAssistant,
+  left: string,
+  right: string
+): number => {
+  const leftState = hass.states[left];
+  const rightState = hass.states[right];
 
-const groupEntitiesByDevice = (
+  const leftName = leftState
+    ? computeMaintenanceRowName(hass, leftState)
+    : left;
+  const rightName = rightState
+    ? computeMaintenanceRowName(hass, rightState)
+    : right;
+
+  return leftName.localeCompare(rightName, hass.locale.language);
+};
+
+const computeMaintenanceRowName = (
+  hass: HomeAssistant,
+  stateObj: HomeAssistant["states"][string]
+): string => {
+  const { area, device } = getEntityContext(
+    stateObj,
+    hass.entities,
+    hass.devices,
+    hass.areas,
+    hass.floors
+  );
+
+  const name = device
+    ? computeDeviceName(device) || computeStateName(stateObj)
+    : computeStateName(stateObj);
+
+  return area ? stripPrefixFromEntityName(name, area.name) || name : name;
+};
+
+const computeMaintenanceRowConfig = (
+  hass: HomeAssistant,
+  entityId: string
+): LovelaceRowConfig => {
+  const stateObj = hass.states[entityId];
+
+  if (!stateObj) {
+    return entityId;
+  }
+
+  const rowName = computeMaintenanceRowName(hass, stateObj);
+
+  return {
+    entity: entityId,
+    name: rowName,
+  };
+};
+
+const computeMaintenanceEntitiesCard = (
   hass: HomeAssistant,
   entities: string[]
-): DeviceMaintenanceEntities[] => {
-  const entitiesByDevice: Record<string, string[]> = {};
-  const unassignedEntities: string[] = [];
+): EntitiesCardConfig | undefined => {
+  const problems = entities
+    .filter((entityId) => {
+      const stateObj = hass.states[entityId];
+      return (
+        stateObj &&
+        computeDomain(entityId) === "binary_sensor" &&
+        stateObj.attributes.device_class === "problem"
+      );
+    })
+    .sort((left, right) => compareMaintenanceEntities(hass, left, right));
 
-  for (const entityId of entities) {
-    const stateObj = hass.states[entityId];
-    if (!stateObj) {
-      continue;
-    }
+  const batteries = entities
+    .filter((entityId) => {
+      const stateObj = hass.states[entityId];
+      return (
+        stateObj &&
+        computeDomain(entityId) === "sensor" &&
+        stateObj.attributes.device_class === "battery"
+      );
+    })
+    .sort((left, right) => compareMaintenanceEntities(hass, left, right));
 
-    const { device } = getEntityContext(
-      stateObj,
-      hass.entities,
-      hass.devices,
-      hass.areas,
-      hass.floors
-    );
+  const rows: LovelaceRowConfig[] = [
+    ...problems.map((entityId) => computeMaintenanceRowConfig(hass, entityId)),
+    ...(problems.length && batteries.length
+      ? ([{ type: "divider" }] satisfies LovelaceRowConfig[])
+      : []),
+    ...batteries.map((entityId) => computeMaintenanceRowConfig(hass, entityId)),
+  ];
 
-    if (!device) {
-      unassignedEntities.push(entityId);
-      continue;
-    }
-
-    if (!(device.id in entitiesByDevice)) {
-      entitiesByDevice[device.id] = [];
-    }
-
-    entitiesByDevice[device.id].push(entityId);
+  if (!rows.length) {
+    return undefined;
   }
 
-  const grouped = Object.entries(entitiesByDevice).map(([deviceId, ids]) => ({
-    device_id: deviceId,
-    entities: ids,
-  }));
-
-  if (unassignedEntities.length) {
-    grouped.push({
-      device_id: "unassigned",
-      entities: unassignedEntities,
-    });
-  }
-
-  return grouped;
+  return {
+    type: "entities",
+    show_header_toggle: false,
+    state_color: true,
+    entities: rows,
+  };
 };
 
 const processAreaMaintenance = (
@@ -95,108 +145,51 @@ const processAreaMaintenance = (
     return undefined;
   }
 
-  const groupedEntities = groupEntitiesByDevice(hass, entities);
+  const entitiesCard = computeMaintenanceEntitiesCard(hass, entities);
 
-  if (!groupedEntities.length) {
+  if (!entitiesCard) {
     return undefined;
-  }
-
-  const cards: LovelaceCardConfig[] = [
-    {
-      type: "heading",
-      heading: area.name,
-      heading_style: "title",
-      icon: area.icon || undefined,
-      tap_action: {
-        action: "navigate",
-        navigation_path: `areas-${area.area_id}`,
-      },
-    } satisfies HeadingCardConfig,
-  ];
-
-  for (const deviceEntities of groupedEntities) {
-    const device = hass.devices[deviceEntities.device_id];
-    let heading = hass.localize("ui.panel.lovelace.strategy.home.others");
-    if (device) {
-      heading =
-        computeDeviceName(device) ||
-        hass.localize("ui.panel.lovelace.strategy.home.unnamed_device");
-    }
-
-    cards.push({
-      type: "heading",
-      heading: heading,
-      heading_style: "subtitle",
-      tap_action:
-        device && hass.user?.is_admin
-          ? {
-              action: "navigate",
-              navigation_path: `/config/devices/device/${device.id}`,
-            }
-          : undefined,
-    } satisfies HeadingCardConfig);
-
-    cards.push(
-      ...deviceEntities.entities.map((entity) => ({
-        ...computeMaintenanceTileCard(hass, area.name, entity),
-      }))
-    );
   }
 
   return {
     type: "grid",
-    cards: cards,
+    cards: [
+      {
+        type: "heading",
+        heading: area.name,
+        heading_style: "title",
+        icon: area.icon || undefined,
+        tap_action: {
+          action: "navigate",
+          navigation_path: `areas-${area.area_id}`,
+        },
+      } satisfies HeadingCardConfig,
+      entitiesCard,
+    ],
   };
 };
 
-const computeMaintenanceTileCard = (
+const computeUnassignedMaintenanceSection = (
   hass: HomeAssistant,
-  prefix: string,
-  entity: string
-): TileCardConfig => {
-  const card = computeAreaTileCardConfig(
-    hass,
-    prefix
-  )(entity) as TileCardConfig;
-  const stateObj = hass.states[entity];
+  entities: string[]
+): LovelaceSectionRawConfig | undefined => {
+  const entitiesCard = computeMaintenanceEntitiesCard(hass, entities);
 
-  if (
-    stateObj &&
-    computeDomain(entity) === "sensor" &&
-    stateObj.attributes.device_class === "battery"
-  ) {
-    const { device } = getEntityContext(
-      stateObj,
-      hass.entities,
-      hass.devices,
-      hass.areas,
-      hass.floors
-    );
-    const deviceName = device ? computeDeviceName(device) : undefined;
-
-    if (!deviceName) {
-      return {
-        ...card,
-        name: {
-          type: "entity",
-        },
-      };
-    }
-
-    return {
-      ...card,
-      name: {
-        type: "device",
-      },
-      state_content: ["state", "name"],
-    };
+  if (!entitiesCard) {
+    return undefined;
   }
 
   return {
-    ...card,
-    name: {
-      type: "entity",
-    },
+    type: "grid",
+    cards: [
+      {
+        type: "heading",
+        heading: hass.localize("ui.panel.lovelace.strategy.home.devices"),
+        heading_style: "title",
+        icon: "mdi:devices",
+      } satisfies HeadingCardConfig,
+      entitiesCard,
+    ],
   };
 };
 
@@ -257,48 +250,14 @@ export class HomeMaintenanceViewStrategy extends ReactiveElement {
     const unassignedEntities = allMaintenanceEntities.filter(unassignedFilter);
 
     if (unassignedEntities.length) {
-      const groupedEntities = groupEntitiesByDevice(hass, unassignedEntities);
+      const unassignedSection = computeUnassignedMaintenanceSection(
+        hass,
+        unassignedEntities
+      );
 
-      sections.push({
-        type: "grid",
-        cards: [
-          {
-            type: "heading",
-            heading: hass.localize("ui.panel.lovelace.strategy.home.devices"),
-            heading_style: "title",
-            icon: "mdi:devices",
-          } satisfies HeadingCardConfig,
-          ...groupedEntities.flatMap((deviceEntities) => {
-            const device = hass.devices[deviceEntities.device_id];
-            const heading = device
-              ? computeDeviceName(device) ||
-                hass.localize("ui.panel.lovelace.strategy.home.unnamed_device")
-              : hass.localize("ui.panel.lovelace.strategy.home.others");
-
-            return [
-              {
-                type: "heading",
-                heading: heading,
-                heading_style: "subtitle",
-                tap_action:
-                  device && hass.user?.is_admin
-                    ? {
-                        action: "navigate",
-                        navigation_path: `/config/devices/device/${device.id}`,
-                      }
-                    : undefined,
-              } satisfies HeadingCardConfig,
-              ...deviceEntities.entities.map((entity) => ({
-                ...computeMaintenanceTileCard(
-                  hass,
-                  hass.localize("ui.panel.lovelace.strategy.home.devices"),
-                  entity
-                ),
-              })),
-            ];
-          }),
-        ],
-      });
+      if (unassignedSection) {
+        sections.push(unassignedSection);
+      }
     }
 
     if (!sections.length) {
