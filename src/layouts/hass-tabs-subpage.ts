@@ -25,6 +25,7 @@ export interface PageNavigation {
   translationKey?: string;
   component?: string | string[];
   name?: string;
+  badgeCount?: number;
   not_component?: string | string[];
   core?: boolean;
   advancedOnly?: boolean;
@@ -108,6 +109,7 @@ export class HassTabsSubpage extends LitElement {
             <ha-tab
               .active=${page.path === activeTab?.path}
               .narrow=${this.narrow}
+              .badgeCount=${page.badgeCount}
               .name=${page.translationKey
                 ? localizeFunc(page.translationKey)
                 : page.name}

@@ -96,10 +96,7 @@ describe("handleExternalMessage", () => {
       id: 3,
     };
     const result = handleExternalMessage(hassMainEl, msg);
-    expect(fireEvent).toHaveBeenCalledWith(
-      hassMainEl,
-      "hass-show-notifications"
-    );
+    expect(navigate).toHaveBeenCalledWith("/profile/notifications");
     expect(fireMessage).toHaveBeenCalledWith({
       id: 3,
       type: "result",

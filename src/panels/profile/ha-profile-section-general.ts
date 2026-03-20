@@ -22,6 +22,7 @@ import "./ha-enable-shortcuts-row";
 import "./ha-entity-id-picker-row";
 import "./ha-force-narrow-row";
 import { profileSections } from "./ha-panel-profile";
+import type { PageNavigation } from "../../layouts/hass-tabs-subpage";
 import "./ha-pick-dashboard-row";
 import "./ha-pick-date-format-row";
 import "./ha-pick-first-weekday-row";
@@ -40,6 +41,9 @@ class HaProfileSectionGeneral extends LitElement {
   @property({ attribute: false }) public hass!: HomeAssistant;
 
   @property({ type: Boolean }) public narrow = false;
+
+  @property({ attribute: false }) public tabs: PageNavigation[] =
+    profileSections;
 
   @state() private _coreUserData?: CoreFrontendUserData | null;
 
@@ -101,7 +105,7 @@ class HaProfileSectionGeneral extends LitElement {
         main-page
         .hass=${this.hass}
         .narrow=${this.narrow}
-        .tabs=${profileSections}
+        .tabs=${this.tabs}
         .route=${this.route}
       >
         <div slot="title">${this.hass.localize("panel.profile")}</div>

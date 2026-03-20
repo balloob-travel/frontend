@@ -62,7 +62,7 @@ export const handleExternalMessage = (
   } else if (msg.command === "navigate") {
     navigate(msg.payload.path, msg.payload.options);
   } else if (msg.command === "notifications/show") {
-    fireEvent(hassMainEl, "hass-show-notifications");
+    navigate("/profile/notifications");
   } else if (msg.command === "sidebar/toggle") {
     if (mainWindow.history.state?.open) {
       bus.fireMessage({

@@ -1,10 +1,4 @@
-import {
-  mdiBell,
-  mdiCellphoneCog,
-  mdiCog,
-  mdiMenu,
-  mdiMenuOpen,
-} from "@mdi/js";
+import { mdiCellphoneCog, mdiCog, mdiMenu, mdiMenuOpen } from "@mdi/js";
 import type { UnsubscribeFunc } from "home-assistant-js-websocket";
 import type { PropertyValues } from "lit";
 import { css, html, LitElement, nothing } from "lit";
@@ -22,6 +16,7 @@ import { toggleAttribute } from "../common/dom/toggle_attribute";
 import { stringCompare } from "../common/string/compare";
 import { computeRTL } from "../common/util/compute_rtl";
 import { throttle } from "../common/util/throttle";
+import { navigate } from "../common/navigate";
 import { subscribeFrontendUserData } from "../data/frontend";
 import type { ActionHandlerDetail } from "../data/lovelace/action_handler";
 import {
@@ -441,7 +436,6 @@ class HaSidebar extends SubscribeMixin(ScrollableFadeMixin(LitElement)) {
       ${this.hass.user?.is_admin
         ? this._renderConfiguration(selectedPanel)
         : this._renderExternalConfiguration()}
-      ${this._renderNotifications()}
       ${this._renderUserItem(selectedPanel)}
     `;
   }
@@ -514,48 +508,22 @@ class HaSidebar extends SubscribeMixin(ScrollableFadeMixin(LitElement)) {
     `;
   }
 
-  private _renderNotifications() {
+  private _renderUserItem(selectedPanel: string) {
+    const isRTL = computeRTL(this.hass);
+    const isSelected = selectedPanel === "profile";
     const notificationCount = this._notifications
       ? this._notifications.length
       : 0;
 
     return html`
       <ha-md-list-item
-        class="notifications"
-        @click=${this._handleShowNotificationDrawer}
-        @mouseenter=${this._itemMouseEnter}
-        @mouseleave=${this._itemMouseLeave}
         type="button"
-      >
-        <ha-svg-icon slot="start" .path=${mdiBell}></ha-svg-icon>
-        ${notificationCount > 0
-          ? html`
-              <span class="badge" slot="start"> ${notificationCount} </span>
-            `
-          : nothing}
-        <span class="item-text" slot="headline"
-          >${this.hass.localize("ui.notification_drawer.title")}</span
-        >
-        ${notificationCount > 0
-          ? html`<span class="badge" slot="end">${notificationCount}</span>`
-          : nothing}
-      </ha-md-list-item>
-    `;
-  }
-
-  private _renderUserItem(selectedPanel: string) {
-    const isRTL = computeRTL(this.hass);
-    const isSelected = selectedPanel === "profile";
-
-    return html`
-      <ha-md-list-item
-        href="/profile"
-        type="link"
         class=${classMap({
           user: true,
           selected: isSelected,
           rtl: isRTL,
         })}
+        @click=${this._handleOpenProfile}
         @mouseenter=${this._itemMouseEnter}
         @mouseleave=${this._itemMouseLeave}
       >
@@ -564,9 +532,35 @@ class HaSidebar extends SubscribeMixin(ScrollableFadeMixin(LitElement)) {
           .user=${this.hass.user}
           .hass=${this.hass}
         ></ha-user-badge>
+        ${notificationCount > 0
+          ? html`
+              <button
+                slot="start"
+                type="button"
+                class="badge badge-button"
+                aria-label=${this.hass.localize("ui.notification_drawer.title")}
+                @click=${this._handleOpenNotifications}
+              >
+                ${notificationCount}
+              </button>
+            `
+          : nothing}
         <span class="item-text" slot="headline"
           >${this.hass.user ? this.hass.user.name : ""}</span
         >
+        ${notificationCount > 0
+          ? html`
+              <button
+                slot="end"
+                type="button"
+                class="badge badge-button"
+                aria-label=${this.hass.localize("ui.notification_drawer.title")}
+                @click=${this._handleOpenNotifications}
+              >
+                ${notificationCount}
+              </button>
+            `
+          : nothing}
       </ha-md-list-item>
     `;
   }
@@ -697,8 +691,14 @@ class HaSidebar extends SubscribeMixin(ScrollableFadeMixin(LitElement)) {
     }
   }
 
-  private _handleShowNotificationDrawer() {
-    fireEvent(this, "hass-show-notifications");
+  private _handleOpenProfile() {
+    navigate("/profile");
+  }
+
+  private _handleOpenNotifications(ev: Event) {
+    ev.preventDefault();
+    ev.stopPropagation();
+    navigate("/profile/notifications");
   }
 
   private _toggleSidebar(ev: CustomEvent) {
@@ -931,11 +931,34 @@ class HaSidebar extends SubscribeMixin(ScrollableFadeMixin(LitElement)) {
           line-height: var(--ha-line-height-expanded);
           padding: 0 var(--ha-space-1);
         }
+
+        ha-user-badge + .badge[slot="start"] {
+          position: absolute;
+          top: var(--ha-space-1);
+          inset-inline-start: 30px;
+          inset-inline-end: initial;
+          min-width: var(--ha-space-5);
+          width: var(--ha-space-5);
+          height: var(--ha-space-5);
+          padding: 0;
+          border-radius: var(--ha-border-radius-circle);
+          font-size: 0.65em;
+          line-height: 1;
+        }
+
         :host([expanded]) .badge[slot="start"],
         :host(:not([expanded])) .badge[slot="end"] {
           opacity: 0;
           transform: scale(0.8);
           pointer-events: none;
+        }
+
+        .badge-button {
+          appearance: none;
+          -webkit-appearance: none;
+          border: 0;
+          cursor: pointer;
+          font: inherit;
         }
 
         ha-md-list-item.user {

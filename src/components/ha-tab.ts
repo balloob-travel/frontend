@@ -10,9 +10,14 @@ export class HaTab extends LitElement {
 
   @property({ type: Boolean, reflect: true }) public narrow = false;
 
+  @property({ type: Number, attribute: "badge-count" })
+  public badgeCount?: number;
+
   @property() public name?: string;
 
   protected render(): TemplateResult {
+    const hasBadge = !!this.badgeCount;
+
     return html`
       <div
         tabindex="0"
@@ -22,7 +27,14 @@ export class HaTab extends LitElement {
         @keydown=${this._handleKeyDown}
       >
         <slot name="icon"></slot>
-        <span class="name">${this.name}</span>
+        <span class="label">
+          <span class="name">${this.name}</span>
+          ${hasBadge
+            ? html`<span class="badge" aria-hidden="true">
+                ${this.badgeCount}
+              </span>`
+            : ""}
+        </span>
         <ha-ripple></ha-ripple>
       </div>
     `;
@@ -60,6 +72,29 @@ export class HaTab extends LitElement {
       overflow: hidden;
       text-overflow: ellipsis;
       max-width: 100%;
+    }
+
+    .label {
+      display: flex;
+      align-items: center;
+      gap: var(--ha-space-1);
+      min-width: 0;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: var(--ha-space-5);
+      height: var(--ha-space-5);
+      border-radius: var(--ha-border-radius-circle);
+      background-color: var(--accent-color);
+      color: var(--text-accent-color, var(--text-primary-color));
+      font-size: var(--ha-font-size-s);
+      line-height: 1;
+      padding: 0 var(--ha-space-1);
+      box-sizing: border-box;
+      flex-shrink: 0;
     }
 
     :host([active]) {

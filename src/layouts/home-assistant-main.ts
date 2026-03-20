@@ -7,7 +7,6 @@ import { listenMediaQuery } from "../common/dom/media_query";
 import { toggleAttribute } from "../common/dom/toggle_attribute";
 import { computeRTLDirection } from "../common/util/compute_rtl";
 import "../components/ha-drawer";
-import { showNotificationDrawer } from "../dialogs/notifications/show-notification-drawer";
 import type { HomeAssistant, Route } from "../types";
 import "./partial-panel-resolver";
 
@@ -15,7 +14,6 @@ declare global {
   // for fire event
   interface HASSDomEvents {
     "hass-toggle-menu": undefined | { open?: boolean };
-    "hass-show-notifications": undefined;
   }
   interface HTMLElementEventMap {
     "hass-toggle-menu": HASSDomEvent<HASSDomEvents["hass-toggle-menu"]>;
@@ -111,12 +109,6 @@ export class HomeAssistantMain extends LitElement {
                 : "auto",
         });
       }
-    });
-
-    this.addEventListener("hass-show-notifications", () => {
-      showNotificationDrawer(this, {
-        narrow: this.narrow,
-      });
     });
   }
 

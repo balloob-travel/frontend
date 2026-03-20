@@ -2,6 +2,7 @@ import type { CSSResultGroup, TemplateResult } from "lit";
 import { css, html, LitElement } from "lit";
 import { customElement, property, state } from "lit/decorators";
 import "../../layouts/hass-tabs-subpage";
+import type { PageNavigation } from "../../layouts/hass-tabs-subpage";
 import { profileSections } from "./ha-panel-profile";
 import type { RefreshToken } from "../../data/refresh_token";
 import { haStyle } from "../../resources/styles";
@@ -16,6 +17,9 @@ class HaProfileSectionSecurity extends LitElement {
   @property({ attribute: false }) public hass!: HomeAssistant;
 
   @property({ type: Boolean }) public narrow = false;
+
+  @property({ attribute: false }) public tabs: PageNavigation[] =
+    profileSections;
 
   @state() private _refreshTokens?: RefreshToken[];
 
@@ -38,7 +42,7 @@ class HaProfileSectionSecurity extends LitElement {
         main-page
         .hass=${this.hass}
         .narrow=${this.narrow}
-        .tabs=${profileSections}
+        .tabs=${this.tabs}
         .route=${this.route}
       >
         <div slot="title">${this.hass.localize("panel.profile")}</div>

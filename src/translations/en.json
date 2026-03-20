@@ -9722,7 +9722,8 @@
       "profile": {
         "tabs": {
           "general": "General",
-          "security": "Security"
+          "security": "Security",
+          "notifications": "Notifications"
         },
         "current_user": "You are currently logged in as {fullName}.",
         "is_owner": "You are an owner.",
