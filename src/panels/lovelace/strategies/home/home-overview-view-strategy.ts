@@ -23,9 +23,7 @@ import type {
   EmptyStateCardConfig,
   HomeSummaryCard,
   MarkdownCardConfig,
-  RepairsCardConfig,
   TileCardConfig,
-  UpdatesCardConfig,
 } from "../../cards/types";
 import {
   LARGE_SCREEN_CONDITION,
@@ -33,6 +31,7 @@ import {
 } from "../helpers/screen-conditions";
 import type { CommonControlSectionStrategyConfig } from "../usage_prediction/common-controls-section-strategy";
 import { HOME_SUMMARIES_FILTERS } from "./helpers/home-summaries";
+import { getMaintenanceEntities } from "./helpers/home-maintenance";
 import { OTHER_DEVICES_FILTERS } from "./helpers/other-devices-filters";
 
 export interface HomeOverviewViewStrategyConfig {
@@ -232,6 +231,7 @@ export class HomeOverviewViewStrategy extends ReactiveElement {
     const hasSecurity =
       hass.panels.security &&
       findEntities(allEntities, securityFilters).length > 0;
+    const hasMaintenance = getMaintenanceEntities(hass, allEntities).length > 0;
 
     const weatherFilter = generateEntityFilter(hass, {
       domain: "weather",
@@ -256,24 +256,6 @@ export class HomeOverviewViewStrategy extends ReactiveElement {
 
     // Build summary cards (used in both mobile section and sidebar)
     const summaryCards: LovelaceCardConfig[] = [
-      // Repairs card - only visible to admins, hides when empty
-      {
-        type: "repairs",
-        hide_empty: true,
-        tap_action: {
-          action: "navigate",
-          navigation_path: "/config/repairs?historyBack=1",
-        },
-      } satisfies RepairsCardConfig,
-      // Updates card - only visible to admins, hides when empty
-      {
-        type: "updates",
-        hide_empty: true,
-        tap_action: {
-          action: "navigate",
-          navigation_path: "/config/updates?historyBack=1",
-        },
-      } satisfies UpdatesCardConfig,
       // Discovered devices card - only visible to admins, hides when empty
       {
         type: "discovered-devices",
@@ -304,6 +286,15 @@ export class HomeOverviewViewStrategy extends ReactiveElement {
           tap_action: {
             action: "navigate",
             navigation_path: "/security?historyBack=1",
+          },
+        } satisfies HomeSummaryCard),
+      hasMaintenance &&
+        ({
+          type: "home-summary",
+          summary: "maintenance",
+          tap_action: {
+            action: "navigate",
+            navigation_path: "maintenance",
           },
         } satisfies HomeSummaryCard),
       hasMediaPlayers &&

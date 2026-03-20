@@ -33,6 +33,7 @@ import {
   HOME_SUMMARIES_ICONS,
   type HomeSummary,
 } from "../strategies/home/helpers/home-summaries";
+import { countActiveMaintenanceIssues } from "../strategies/home/helpers/home-maintenance";
 import type { LovelaceCard, LovelaceGridOptions } from "../types";
 import { tileCardStyle } from "./tile/tile-card-style";
 import type { HomeSummaryCard } from "./types";
@@ -41,6 +42,7 @@ const COLORS: Record<HomeSummary, string> = {
   light: "amber",
   climate: "deep-orange",
   security: "blue-grey",
+  maintenance: "orange",
   media_players: "blue",
   energy: "amber",
 };
@@ -247,6 +249,38 @@ export class HuiHomeSummaryCard
               count: playingMedia.length,
             })
           : this.hass.localize("ui.card.home-summary.no_media_playing");
+      }
+      case "maintenance": {
+        const { lowBatteries, problems } = countActiveMaintenanceIssues(
+          this.hass
+        );
+
+        if (lowBatteries > 0 && problems > 0) {
+          return this.hass.localize(
+            "ui.card.home-summary.count_low_batteries_and_problems",
+            {
+              battery_count: lowBatteries,
+              problem_count: problems,
+            }
+          );
+        }
+
+        if (lowBatteries > 0) {
+          return this.hass.localize(
+            "ui.card.home-summary.count_low_batteries",
+            {
+              count: lowBatteries,
+            }
+          );
+        }
+
+        if (problems > 0) {
+          return this.hass.localize("ui.card.home-summary.count_problems", {
+            count: problems,
+          });
+        }
+
+        return this.hass.localize("ui.card.home-summary.all_maintenance_ok");
       }
       case "energy": {
         if (!this._energyData) {

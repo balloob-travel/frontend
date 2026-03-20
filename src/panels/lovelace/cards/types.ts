@@ -713,3 +713,7 @@ export interface UpdatesCardConfig extends LovelaceCardConfig {
   hold_action?: ActionConfig;
   double_tap_action?: ActionConfig;
 }
+
+export interface MaintenanceStatusCardConfig extends LovelaceCardConfig {
+  hide_empty?: boolean;
+}

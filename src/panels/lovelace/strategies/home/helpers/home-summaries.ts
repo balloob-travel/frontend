@@ -8,6 +8,7 @@ export const HOME_SUMMARIES = [
   "light",
   "climate",
   "security",
+  "maintenance",
   "media_players",
   "energy",
 ] as const;
@@ -18,6 +19,7 @@ export const HOME_SUMMARIES_ICONS: Record<HomeSummary, string> = {
   light: "mdi:lamps",
   climate: "mdi:home-thermometer",
   security: "mdi:security",
+  maintenance: "mdi:wrench",
   media_players: "mdi:multimedia",
   energy: "mdi:lightning-bolt",
 };
@@ -26,6 +28,7 @@ export const HOME_SUMMARIES_FILTERS: Record<HomeSummary, EntityFilter[]> = {
   light: lightEntityFilters,
   climate: climateEntityFilters,
   security: securityEntityFilters,
+  maintenance: [],
   media_players: [{ domain: "media_player", entity_category: "none" }],
   energy: [], // Uses energy collection data
 };

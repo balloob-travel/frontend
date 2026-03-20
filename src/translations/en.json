@@ -213,6 +213,10 @@
         "count_locks_unlocked": "{count} {count, plural,\n one {unlocked}\n other {unlocked}\n}",
         "count_alarms_disarmed": "{count} {count, plural,\n one {disarmed}\n other {disarmed}\n}",
         "all_secure": "All secure",
+        "all_maintenance_ok": "All good",
+        "count_low_batteries": "{count} {count, plural,\n one {low battery}\n other {low batteries}\n}",
+        "count_problems": "{count} {count, plural,\n one {problem}\n other {problems}\n}",
+        "count_low_batteries_and_problems": "{battery_count} {battery_count, plural,\n one {low battery}\n other {low batteries}\n}, {problem_count} {problem_count, plural,\n one {problem}\n other {problems}\n}",
         "no_media_playing": "No media playing",
         "count_media_playing": "{count} {count, plural,\n one {playing}\n other {playing}\n}"
       },
@@ -8062,6 +8066,7 @@
           "home": {
             "summary_list": {
               "media_players": "Media players",
+              "maintenance": "Maintenance",
               "other_devices": "Other devices",
               "weather": "Weather",
               "energy": "Today's energy"
@@ -8104,6 +8109,11 @@
           "home_media_players": {
             "media_players": "Media players",
             "other_media_players": "Other media players"
+          },
+          "home-maintenance": {
+            "status": "Status",
+            "all_good_title": "Everything looks good",
+            "all_good_content": "Battery and problem entities will show up here when they are available."
           },
           "home-other-devices": {
             "helpers": "Helpers",

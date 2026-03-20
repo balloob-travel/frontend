@@ -9,6 +9,8 @@ import { computeCssColor } from "../../../common/color/compute-color";
 import { hsv2rgb, rgb2hex, rgb2hsv } from "../../../common/color/convert-color";
 import { DOMAINS_TOGGLE } from "../../../common/const";
 import { computeDomain } from "../../../common/entity/compute_domain";
+import { computeEntityName } from "../../../common/entity/compute_entity_name";
+import { computeStateName } from "../../../common/entity/compute_state_name";
 import { stateActive } from "../../../common/entity/state_active";
 import { stateColorCss } from "../../../common/entity/state_color";
 import "../../../components/ha-card";
@@ -261,6 +263,9 @@ export class HuiTileCard extends LitElement implements LovelaceCard {
       stateObj,
       this._config.name
     );
+    const entityName =
+      computeEntityName(stateObj, this.hass.entities, this.hass.devices) ||
+      computeStateName(stateObj);
 
     const active = stateActive(stateObj);
     const color = this._computeStateColor(stateObj, this._config.color);
@@ -273,6 +278,7 @@ export class HuiTileCard extends LitElement implements LovelaceCard {
             .stateObj=${stateObj}
             .hass=${this.hass}
             .content=${this._config.state_content}
+            .name=${entityName}
           >
           </state-display>
         `;

@@ -10,6 +10,7 @@ import {
   HOME_SUMMARIES_ICONS,
 } from "./helpers/home-summaries";
 import type { HomeAreaViewStrategyConfig } from "./home-area-view-strategy";
+import type { HomeMaintenanceViewStrategyConfig } from "./home-maintenance-view-strategy";
 import type { HomeOtherDevicesViewStrategyConfig } from "./home-other-devices-view-strategy";
 import type { HomeOverviewViewStrategyConfig } from "./home-overview-view-strategy";
 
@@ -74,6 +75,16 @@ export class HomeDashboardStrategy extends ReactiveElement {
       icon: HOME_SUMMARIES_ICONS.media_players,
     } satisfies LovelaceViewRawConfig;
 
+    const maintenanceView = {
+      title: getSummaryLabel(hass.localize, "maintenance"),
+      path: "maintenance",
+      subview: true,
+      strategy: {
+        type: "home-maintenance",
+      } satisfies HomeMaintenanceViewStrategyConfig,
+      icon: HOME_SUMMARIES_ICONS.maintenance,
+    } satisfies LovelaceViewRawConfig;
+
     const otherDevicesView = {
       title: hass.localize("ui.panel.lovelace.strategy.home.devices"),
       path: "other-devices",
@@ -98,6 +109,7 @@ export class HomeDashboardStrategy extends ReactiveElement {
         },
         ...areaViews,
         mediaPlayersView,
+        maintenanceView,
         otherDevicesView,
       ],
     };
